@@ -249,7 +249,7 @@ def search_product():
         food_info = {
             "fdcId": food.get("fdcId"),
             "name": name,
-            "brand": brand,
+            "brandName": brand,
             "ingredients": food.get("ingredients", "Ingredients not available"),
             "nutrition": {
                 "calories": None,
