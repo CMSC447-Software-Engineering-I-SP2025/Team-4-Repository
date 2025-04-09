@@ -214,6 +214,9 @@ def email_auth():
 
 USDA_API_URL = "https://api.nal.usda.gov/fdc/v1/foods/search"
 USDA_API_KEY = "ErqPLe9V080QM2baXIjUt40zxkon8al2JBfwqKJN"
+# food intake collection 
+
+
 # GOOGLE_API_KEY = "AIzaSyDqPggIMYWxVREK0l1a_zxnORiDj-Bd7AM"
 # SEARCH_ENGINE_ID = "a1fd8a68793a64ed1"
 
@@ -417,6 +420,35 @@ def search_product():
             "total_pages": total_pages
         }
     })
+    
+FOOD_LOG = 'food_intake' # new mongoDB collection for food storage logs. note: initializes the first time it is inserted into
+@app.route("/api/log_food", methods=["GET", "POST", "DELETE"])
+def log_food():
+    # connect to 'food_log' collection in mongodb
+    food_collection = data.atlas_client.get_collection(FOOD_LOG)
+    
+    if request.method == 'POST':
+        # get food intake data from frontend
+        log_data = request.get_json()
+        
+        # food logging fields
+        required_fields = ['email', 'fdcId', 'productName', 'servingSize', 'mealType', 'timestamp']
+            
+        # if returned dictionary in log_data does not contain all of the required fields
+        if not all(field in log_data for field in required_fields):
+            return jsonify({"message": "missing some required field :("}), 400
+        
+        # try to insert the log_data into the FOOD_LOG collection for the specified user
+        try:
+            food_log_collection.insert_one(log_data)
+            return jsonify({"message": "food log added successfully :)"}), 200
+        except Exception as e:
+            print("POST error:", str(e))
+            return jsonify({"message": "error logging food :("}), 500
+        
+    '''if request.method == 'POST':
+        
+    if request.method == 'DELETE':'''
 
 if __name__ == '__main__':
     app.run(debug=True)
