@@ -1,3 +1,4 @@
+// src/pages/ViewProducts.jsx
 import { useState, useContext, useEffect } from "react";
 import { LoginContext } from "../contexts/LoginContext";
 import Popup from "../components/PopUp";
@@ -6,57 +7,62 @@ import "./ViewProducts.css";
 const BACKEND_API_URL = "http://127.0.0.1:5000/api";
 
 function ViewProducts() {
+
   const [product, setProduct] = useState("");
   const [results, setResults] = useState([]);
   const [groceryList, setGroceryList] = useState([]);
+  const [favoritesList, setFavoritesList] = useState([]); // <-- State for favorites (KEEP)
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Stuff for conditional (logged in/logged out) add to cart pop up display
+  // Pop up state
   const { isLoggedIn, user } = useContext(LoginContext);
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState("");
   const [showLoginButton, setShowLoginButton] = useState(false);
 
-  // Stuff for additional search filtering (query params)
-  const [dataType, setDataType] = useState([]); // Array to hold selected data types
-  const [sortBy, setSortBy] = useState("dataType.keyword"); // Making default sortBy dataType instead of description since description was searching the ingredient lists
-  const [sortOrder, setSortOrder] = useState("asc"); // Default sort order is ascending
-  const [brandOwner, setBrandOwner] = useState(""); 
+  // Search filter state
+  const [dataType, setDataType] = useState([]);
+  const [sortBy, setSortBy] = useState("dataType.keyword");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [brandOwner, setBrandOwner] = useState("");
+
+  // Stuff for product details popup
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showProductDetails, setShowProductDetails] = useState(false);
 
   // Fetch grocery list when user logs in
   useEffect(() => {
-    
     if (isLoggedIn && user) {
-      fetchGroceryList(user.email);
+      fetchUserData(user.email);
+    } else {
+      // Clear lists if user logs out
+      setGroceryList([]);
+      setFavoritesList([]); // <-- Clear favorites list on logout (KEEP)
     }
-  
   }, [isLoggedIn, user]);
 
-  // Function to fetch grocery list from backend
-  const fetchGroceryList = async (email) => {
-    
+  // Function to fetch user data (grocery list and favorites) from backend
+  const fetchUserData = async (email) => { // <-- Function now fetches favorites too (KEEP)
     try {
-    
       const response = await fetch(`${BACKEND_API_URL}/user?email=${email}`);
-    
       if (response.ok) {
         const userData = await response.json();
-        console.log("User data:", userData);
+        console.log("User data fetched:", userData);
         setGroceryList(userData.groceryList || []);
+        setFavoritesList(userData.favorites || []); // <-- Set favorites list (KEEP)
+      } else {
+          console.error("Failed to fetch user data:", response.statusText);
       }
-    
     } catch (error) {
-      console.error("Error fetching grocery list:", error);
+      console.error("Error fetching user data:", error);
     }
   };
 
   // Function to update grocery list in backend
-  const updateGroceryList = async (email, newGroceryList) => {
-    
+  const updateGroceryListBackend = async (email, newGroceryList) => {
     try {
-      
       await fetch(`${BACKEND_API_URL}/user`, {
         method: "PUT",
         headers: {
@@ -64,29 +70,45 @@ function ViewProducts() {
         },
         body: JSON.stringify({ email, groceryList: newGroceryList }),
       });
-
+      // Add response handling if needed
     } catch (error) {
       console.error("Error updating grocery list:", error);
     }
   };
 
+  // Function to update favorites list in backend <-- New function for favorites (KEEP)
+  const updateFavoritesListBackend = async (email, newFavoritesList) => {
+    try {
+      await fetch(`${BACKEND_API_URL}/user`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        // Send only email and the updated favorites list
+        body: JSON.stringify({ email, favorites: newFavoritesList }),
+      });
+       // Add response handling if needed
+    } catch (error) {
+      console.error("Error updating favorites list:", error);
+    }
+  };
+
+
   // Function to search for products
   const searchProducts = async (page = 1) => {
-  
+    // ... (keep existing searchProducts logic from before)
     try {
-  
       // Handle case where page # > total pages
-      if (page > totalPages) {
+      if (page > totalPages && page !== 1) {
         console.warn("Page number exceeds total pages. No more results to fetch.");
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
-  
+
       const response = await fetch(
-        // Include all query params that aren't null or empty
-        `${BACKEND_API_URL}/search?product=${product}&page=${page}&pageSize=10&dataType=${dataType}&sortBy=${sortBy}&sortOrder=${sortOrder}&brandOwner=${brandOwner}`
+        `${BACKEND_API_URL}/search?product=${product}&page=${page}&pageSize=10&dataType=${dataType.join(',')}&sortBy=${sortBy}&sortOrder=${sortOrder}&brandOwner=${brandOwner}`
       );
 
       if (!response.ok) {
@@ -95,17 +117,18 @@ function ViewProducts() {
 
       const data = await response.json();
 
+       // Reset results on new search (page 1), append otherwise
       if (page === 1) {
         setResults(data.results);
+        setCurrentPage(1); // Reset current page on new search
+        setTotalPages(data.paging_info.total_pages);
       } else {
         setResults((prevResults) => [...prevResults, ...data.results]);
       }
 
-      setTotalPages(data.paging_info.total_pages);
       setIsLoading(false);
-    
+
     } catch (error) {
-    
       console.error("Error fetching products:", error);
       setIsLoading(false);
     }
@@ -118,45 +141,29 @@ function ViewProducts() {
     searchProducts(nextPage);
   };
 
-  
+
   // Functions for adding/removing/incrementing/decrementing item from grocery list
   const addToGroceryList = (product) => {
-  
-    // If user is logged in, add product to grocery list and show success pop up
+    // ... (keep existing addToGroceryList logic)
     if (isLoggedIn && user) {
-  
       const existingProduct = groceryList.find(
         (item) => item.fdcId === product.fdcId
       );
-  
       let newGroceryList;
-  
       if (existingProduct) {
-  
-        // If product already exists in grocery list, increment quantity by 1
         existingProduct.quantity += 1;
         newGroceryList = [...groceryList];
-  
       } else {
-  
-        // If product doesn't exist in grocery list, add it with quantity of 1
-        product.quantity = 1;
-        newGroceryList = [...groceryList, product];
-  
+        const productToAdd = { ...product, quantity: 1 };
+        newGroceryList = [...groceryList, productToAdd];
       }
-  
       setGroceryList(newGroceryList);
-      updateGroceryList(user.email, newGroceryList);
+      updateGroceryListBackend(user.email, newGroceryList);
       setShowPopup(true);
       setPopupMessage("Product added to grocery list!");
       setShowLoginButton(false);
-
-      // Close popup after 5 seconds
-      setTimeout(() => {
-        setShowPopup(false);
-      }, 5000);
+      setTimeout(() => setShowPopup(false), 3000); // Use the 3-second timeout
     } else {
-      // Else, show popup prompting user to login with button to login page
       setShowPopup(true);
       setPopupMessage("Please log in to add products to your grocery list.");
       setShowLoginButton(true);
@@ -164,65 +171,110 @@ function ViewProducts() {
   };
 
   const removeFromGroceryList = (product) => {
-    // Remove product from grocery list and show success pop up
-    if (isLoggedIn && user) {
+    // ... (keep existing removeFromGroceryList logic)
+     if (isLoggedIn && user) {
       const newGroceryList = groceryList.filter((item) => item.fdcId !== product.fdcId);
       setGroceryList(newGroceryList);
-      updateGroceryList(user.email, newGroceryList);
-      setShowPopup(true);
-      setPopupMessage("Product removed from grocery list!");
-      setShowLoginButton(false);
-
-      // Close popup after 5 seconds
-      setTimeout(() => {
-        setShowPopup(false);
-      }, 5000);
+      updateGroceryListBackend(user.email, newGroceryList);
+      // Optional: Show confirmation popup
     }
   };
 
   const incrementQuantity = (product) => {
-    // Increment quantity of product in grocery list
-    if (isLoggedIn && user) {
+    // ... (keep existing incrementQuantity logic)
+     if (isLoggedIn && user) {
       const newGroceryList = groceryList.map((item) =>
         item.fdcId === product.fdcId
           ? { ...item, quantity: item.quantity + 1 }
           : item
       );
       setGroceryList(newGroceryList);
-      updateGroceryList(user.email, newGroceryList);
+      updateGroceryListBackend(user.email, newGroceryList);
     }
   };
 
   const decrementQuantity = (product) => {
-    // Decrement quantity of product in grocery list
+    // ... (keep existing decrementQuantity logic)
     if (isLoggedIn && user) {
       const newGroceryList = groceryList.map((item) =>
         item.fdcId === product.fdcId && item.quantity > 1
           ? { ...item, quantity: item.quantity - 1 }
           : item
-      );
+      ).filter(item => !(item.fdcId === product.fdcId && item.quantity <= 1)); // Also remove if quantity becomes 0 or less
+
+      const itemExists = newGroceryList.some(item => item.fdcId === product.fdcId);
+      if (!itemExists && product.quantity === 1) {
+           removeFromGroceryList(product);
+           return;
+      }
+
       setGroceryList(newGroceryList);
-      updateGroceryList(user.email, newGroceryList);
+      updateGroceryListBackend(user.email, newGroceryList);
     }
   };
 
-  // Popup close function to pass to Popup component
+  // Functions for adding/removing item from favorites list <-- New Functions (KEEP)
+  const addToFavorites = (product) => {
+    if (isLoggedIn && user) {
+       if (favoritesList.some(item => item.fdcId === product.fdcId)) {
+           console.log("Product already in favorites");
+           return; // Or show a message
+       }
+       const { quantity, ...productData } = product; // Exclude quantity for favorites
+       const newFavoritesList = [...favoritesList, productData];
+       setFavoritesList(newFavoritesList);
+       updateFavoritesListBackend(user.email, newFavoritesList);
+       setShowPopup(true);
+       setPopupMessage("Product added to favorites!");
+       setShowLoginButton(false);
+       setTimeout(() => setShowPopup(false), 3000);
+    } else {
+        setShowPopup(true);
+        setPopupMessage("Please log in to favorite products.");
+        setShowLoginButton(true);
+    }
+  };
+
+  const removeFromFavorites = (product) => {
+      if (isLoggedIn && user) {
+          const newFavoritesList = favoritesList.filter((item) => item.fdcId !== product.fdcId);
+          setFavoritesList(newFavoritesList);
+          updateFavoritesListBackend(user.email, newFavoritesList);
+           setShowPopup(true);
+           setPopupMessage("Product removed from favorites.");
+           setShowLoginButton(false);
+           setTimeout(() => setShowPopup(false), 3000);
+      }
+  };
+
+
+  // Popup close function
   const handleClosePopup = () => {
     setShowPopup(false);
   };
 
   // Function to handle data type checkbox changes
   const handleDataTypeChange = (event) => {
+    // ... (keep existing handleDataTypeChange logic)
     const value = event.target.value;
+    const isChecked = event.target.checked;
     setDataType((prevDataTypes) => {
-      if (prevDataTypes.includes(value)) {
-        // If already selected, remove it
-        return prevDataTypes.filter((type) => type !== value);
-      } else {
-        // If not selected, add it
+      if (isChecked) {
         return [...prevDataTypes, value];
+      } else {
+        return prevDataTypes.filter((type) => type !== value);
       }
     });
+  };
+
+  const viewProductDetails = (product) => {
+    setSelectedProduct(product);
+    setShowProductDetails(true);
+  };
+
+  const closeProductDetails = () => {
+    setSelectedProduct(null);
+    setShowProductDetails(false);
   };
 
   return (
@@ -230,44 +282,40 @@ function ViewProducts() {
       <h1>NomCents</h1>
 
       <div className="search-filters">
-        <input
+        {/* Search Inputs */}
+         <input
           type="text"
           placeholder="Search for a product..."
           value={product}
           onChange={(e) => setProduct(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && searchProducts(1)}
         />
-        <button onClick={() => searchProducts(1)}>Search</button>
-        
+        <button onClick={() => searchProducts(1)} disabled={isLoading}>Search</button>
+
+        {/* Filters */}
         <fieldset>
           <legend>Data Type</legend>
-          <label>
-            <input type="checkbox" value="Branded" onChange={handleDataTypeChange} /> Branded
+           <label>
+            <input type="checkbox" value="Branded" onChange={handleDataTypeChange} checked={dataType.includes("Branded")} /> Branded
           </label>
           <label>
-            <input type="checkbox" value="Foundation" onChange={handleDataTypeChange} /> Foundation
+            <input type="checkbox" value="Foundation" onChange={handleDataTypeChange} checked={dataType.includes("Foundation")} /> Foundation
           </label>
           <label>
-            <input type="checkbox" value="Survey (FNDDS)" onChange={handleDataTypeChange} /> Survey (FNDDS)
+            <input type="checkbox" value="Survey (FNDDS)" onChange={handleDataTypeChange} checked={dataType.includes("Survey (FNDDS)")} /> Survey (FNDDS)
           </label>
-          <label>
-            <input type="checkbox" value="SR Legacy" onChange={handleDataTypeChange} /> SR Legacy
-          </label>
-          <label>
-            <input type="checkbox" value="Experimental" onChange={handleDataTypeChange} /> Experimental
-          </label>
-          <label>
-            <input type="checkbox" value="Other" onChange={handleDataTypeChange} /> Other
+           <label>
+            <input type="checkbox" value="SR Legacy" onChange={handleDataTypeChange} checked={dataType.includes("SR Legacy")} /> SR Legacy
           </label>
         </fieldset>
 
-        <label htmlFor="sortBy">Sort By</label>
+         <label htmlFor="sortBy">Sort By</label>
         <select id="sortBy" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
           <option value="dataType.keyword">Data Type</option>
+          <option value="lowercaseDescription.keyword">Description</option>
           <option value="fdcId">FDC ID</option>
-          <option value="lowercaseDescription.keyword">Ingredients</option>
           <option value="brandOwner.keyword">Brand Owner</option>
           <option value="publishedDate">Published Date</option>
-          <option value="modifiedDate">Modified Date</option>
         </select>
 
         <label htmlFor="sortOrder">Sort Order</label>
@@ -287,61 +335,117 @@ function ViewProducts() {
           placeholder="Enter brand owner (optional)..."
           value={brandOwner}
           onChange={(e) => setBrandOwner(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && searchProducts(1)}
         />
-
       </div>
 
       <div>
         <h2>Search Results</h2>
-        <ul>
-          <div className="search-results">
+        {isLoading && currentPage === 1 ? <p>Loading results...</p> : null}
+        {results.length === 0 && !isLoading ? <p>No products found.</p> : null}
+        <div className="search-results"> {/* Changed from ul to div for card layout */}
             {results.map((product) => {
               const inGroceryList = groceryList.find(
                 (item) => item.fdcId === product.fdcId
               );
+              const isFavorite = favoritesList.some( // <-- Check if product is favorite (KEEP)
+                 (item) => item.fdcId === product.fdcId
+              );
               return (
                 <div key={product.fdcId}>
-                  <div className="product-card">
-                    <h3>{product.name}</h3>
-                    <p> Brand Owner: {product.brandOwner}</p>
-                    <p> Brand Name: {product.brandName}</p>
-                    <p>Ingredients: {product.ingredients}</p>
-                    <p>
-                      <ul>
-                        {product.foodNutrients
-                          ? product.foodNutrients.map((nutrient) => (
-                              <li key={nutrient.nutrientId}>
-                                {nutrient.nutrientName}: {nutrient.value}
-                              </li>
-                            ))
-                          : "None"}
-                      </ul>
-                    </p>
-                    {inGroceryList ? (
-                      <>
-                        <button onClick={() => decrementQuantity(product)}>
-                          -
+                  <div className="product-card" 
+                  onClick={() => viewProductDetails(product)} // Open product details popup on click
+                  style={{ cursor: "pointer" }}>
+                      <h3>{product.name}</h3>
+                      <p>Brand Owner: {product.brandOwner}</p>
+                      <p>Brand Name: {product.brandName}</p>
+                      <p>Ingredients: {product.ingredients}</p>
+                      <p>
+                        <ul>
+                          {product.foodNutrients
+                            ? product.foodNutrients.map((nutrient) => (
+                                <li key={nutrient.nutrientId}>
+                                  {nutrient.nutrientName}: {nutrient.value}
+                                </li>
+                              ))
+                            : "None"}
+                        </ul>
+                      </p>
+                      {inGroceryList ? (
+                        <>
+                          <button onClick={() => decrementQuantity(product)}>
+                            -
+                          </button>
+                          <span>{inGroceryList.quantity}</span>
+                          <button onClick={() => incrementQuantity(product)}>
+                            +
+                          </button>
+                          <button onClick={() => removeFromGroceryList(product)}>
+                            Remove from Grocery List
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => addToGroceryList(product)}>
+                          Add to Grocery List
                         </button>
-                        <span>{inGroceryList.quantity}</span>
-                        <button onClick={() => incrementQuantity(product)}>
-                          +
-                        </button>
-                        <button onClick={() => removeFromGroceryList(product)}>
-                          Remove from Grocery List
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={() => addToGroceryList(product)}>
-                        Add to Grocery List
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
               );
             })}
           </div>
-        </ul>
+
+         {showPopup && (
+            <Popup
+            message={popupMessage}
+            closePopup={handleClosePopup}
+            showLoginButton={showLoginButton}
+            />
+        )}
+        {/* Load More Button */}
+        {results.length > 0 && currentPage < totalPages && (
+             <button onClick={loadMoreProducts} disabled={isLoading} style={{ marginTop: '20px' }}> {/* Added margin top */}
+                 {isLoading ? "Loading..." : "Load More"}
+            </button>
+        )}
       </div>
+
+      {/* Product Details Popup */}
+      {showProductDetails && selectedProduct && (
+        <Popup
+          message={
+            <div>
+              <h1>{selectedProduct.name}</h1>
+              <p>Brand: {selectedProduct.brandName}</p>
+              <p>Brand Owner: {selectedProduct.brandOwner}</p>
+              <p>Ingredients: {selectedProduct.ingredients}</p>
+              <h2>Nutrition</h2>
+              <ul>
+                <li>Calories: {selectedProduct.nutrition.calories}</li>
+                <li>Protein: {selectedProduct.nutrition.protein}</li>
+                <li>Fat: {selectedProduct.nutrition.fat}</li>
+                <li>Carbohydrates: {selectedProduct.nutrition.carbohydrates}</li>
+                <li>Sugars: {selectedProduct.nutrition.sugars}</li>
+                <li>Fiber: {selectedProduct.nutrition.fiber}</li>
+              </ul>
+              <h2>Vitamins and Minerals</h2>
+              <ul>
+                {Object.entries(selectedProduct.nutrition.vitamins || {}).map(
+                  ([key, value]) => (
+                    <li key={key}>
+                      {key}: {value}
+                    </li>
+                  )
+                )}
+              </ul>
+              <button onClick={closeProductDetails}>Close</button>
+            </div>
+          }
+          closePopup={closeProductDetails}
+          showLoginButton={false}
+          popupType="product-details"
+        />
+      )}
       {showPopup && (
         <Popup
           message={popupMessage}
