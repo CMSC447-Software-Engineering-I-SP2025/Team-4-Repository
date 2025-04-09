@@ -1,6 +1,7 @@
 import { useState, useContext, useEffect } from "react";
 import { LoginContext } from "../contexts/LoginContext";
 import Popup from "../components/PopUp";
+import FoodLogModal from "../components/FoodLogModal";
 import "./ViewProducts.css";
 
 const BACKEND_API_URL = "http://127.0.0.1:5000/api";
@@ -23,7 +24,12 @@ function ViewProducts() {
   const [dataType, setDataType] = useState([]); // Array to hold selected data types
   const [sortBy, setSortBy] = useState("dataType.keyword"); // Making default sortBy dataType instead of description since description was searching the ingredient lists
   const [sortOrder, setSortOrder] = useState("asc"); // Default sort order is ascending
-  const [brandOwner, setBrandOwner] = useState(""); 
+  const [brandOwner, setBrandOwner] = useState("");
+  
+  // for food logging
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+ 
 
   // Fetch grocery list when user logs in
   useEffect(() => {
@@ -225,6 +231,40 @@ function ViewProducts() {
     });
   };
 
+  const openLogModal = (product) => {
+    setSelectedProduct(product);
+    setShowLogModal(true);
+  };
+  
+  const closeLogModal = () => {
+    setShowLogModal(false);
+  };
+  
+  const handleLogSubmit = async (logData) => {
+    try {
+      const response = await fetch(`${BACKEND_API_URL}/log_food`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email,
+          fdcId: logData.fdcId,
+          productName: logData.name,
+          servingSize: logData.servingSize,
+          mealType: logData.mealType,
+          timestamp: logData.timestamp, // might change to just the date later
+        }),
+      });
+  
+      const result = await response.json();
+      alert(result.message || "Log added! :)");
+      setShowLogModal(false);
+    } catch (err) {
+      console.error("Error logging food:", err);
+      alert("Error logging food.");
+    }
+  };
+  
+
   return (
     <div className="ViewProducts">
       <h1>NomCents</h1>
@@ -293,9 +333,11 @@ function ViewProducts() {
 
       <div>
         <h2>Search Results</h2>
+        {isLoading && currentPage === 1 ? <p>Loading results...</p> : null}
+        {results.length === 0 && !isLoading ? <p>No products found.</p> : null}
         <ul>
           <div className="search-results">
-            {results.map((product) => {
+            { results.map((product) => {
               const inGroceryList = groceryList.find(
                 (item) => item.fdcId === product.fdcId
               );
@@ -335,6 +377,12 @@ function ViewProducts() {
                         Add to Grocery List
                       </button>
                     )}
+
+                    {isLoggedIn && (
+                      <button onClick={() => openLogModal(product)}>
+                        Log Food
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -352,6 +400,14 @@ function ViewProducts() {
       <button onClick={loadMoreProducts} disabled={isLoading || currentPage >= totalPages}>
         {isLoading ? "Loading..." : "Load More"}
       </button>
+
+      {showLogModal && selectedProduct && (
+        <FoodLogModal
+          product={selectedProduct}
+          onClose={closeLogModal}
+          onSubmit={handleLogSubmit}
+        />
+      )}
     </div>
   );
 }
