@@ -8,6 +8,8 @@ from bson import ObjectId
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
 import traceback
+from datetime import datetime
+
 ##the authenticator produces output of form 
 ##    { "id": "1234", "given_name": "John", "name": "John Doe", "email": "john_doe@idp.example" }
 ## for now we can just store that whole thing, we will use the email as the indexing entity tho because theoretically we might want to support email password logins
@@ -432,7 +434,7 @@ def log_food():
         # get food intake data from frontend
         log_data = request.get_json()
         # adding logs for debugging
-        print("data from frontend:", log_data)
+        # print("data from frontend:", log_data)
         
         # food logging fields
         required_fields = ['email', 'fdcId', 'productName', 'servingSize', 'mealType', 'timestamp']
@@ -441,14 +443,66 @@ def log_food():
         if not all(field in log_data for field in required_fields):
             return jsonify({"message": "missing some required field :("}), 400
         
-        # try to insert the log_data into the FOOD_LOG collection for the specified user
+        # extract the date from timestamp
         try:
-            food_collection.insert_one(log_data)
+            log_date = datetime.fromisoformat(log_data["timestamp"].replace("Z", "+00:00")).date().isoformat()
+        except Exception as e:
+            print("problem parsing timestamp:", str(e))
+            return jsonify({"message": "invalid timestamp format"}), 400
+        
+        # set vars for JSON to insert into mongoDB appropriately
+        meal_type = log_data["mealType"].lower()
+        email = log_data["email"]
+        
+        # make sure a document exists for the user
+        food_collection.update_one(
+            {"email": email},
+            {"$setOnInsert": {"email": email, "logs": {}, "dailyTotals": {}}},
+            upsert=True
+        )
+        
+        # create nested structure for the date
+        food_collection.update_one(
+            {"email": email, f"logs.{log_date}": {"$exists": False}},
+            {"$set": {f"logs.{log_date}": {"meals": {}}}}
+        )
+        
+        # meal type array structure
+        food_collection.update_one(
+            {"email": email, f"logs.{log_date}.meals.{meal_type}": {"$exists": False}},
+            {"$set": {f"logs.{log_date}.meals.{meal_type}": []}}
+        )
+        
+        try:
+            # push log into the correct meal type array
+            food_collection.update_one(
+                {"email": email},
+                {"$push": {f"logs.{log_date}.meals.{meal_type}": log_data}}
+            )
+            
+            # get nutritional data from log_data 
+            nutrition = log_data.get("nutrition", {})
+        
+            # update daily totals for calories if nutrition data exists
+            if nutrition:
+                inc_fields = {}
+                for key, value in nutrition.items():
+                    try:
+                        numeric_value = float(value)
+                        inc_fields[f"dailyTotals.{key}"] = numeric_value
+                    except Exception:
+                        pass
+                if inc_fields:
+                    food_collection.update_one(
+                        {"email": email},
+                        {"$inc": inc_fields}
+                    )
+                    
             return jsonify({"message": "food log added successfully :)"}), 200
         except Exception as e:
             print("POST error:", str(e))
-            traceback.print_exc() # running into an error when hitting submit on food to log
-            return jsonify({"message": "error logging food :("}), 500
+            # traceback.print_exc()
+            return jsonify({"message": "error logging food"}), 500
         
 
 if __name__ == '__main__':

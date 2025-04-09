@@ -241,14 +241,15 @@ function ViewProducts() {
   };
   
   const handleLogSubmit = async (logData) => {
+    if (isLoggedIn && user){
     try {
       const response = await fetch(`${BACKEND_API_URL}/log_food`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: user.email,
+          email: user.email, // need to ensure that this is being defined
           fdcId: logData.fdcId,
-          productName: logData.name,
+          productName: logData.productName, // updated to match modal properties
           servingSize: logData.servingSize,
           mealType: logData.mealType,
           timestamp: logData.timestamp, // might change to just the date later
@@ -261,6 +262,14 @@ function ViewProducts() {
     } catch (err) {
       console.error("Error logging food:", err);
       alert("Error logging food.");
+      // console.log("User:", user); // for debugging
+    }
+
+    //console.log("sending log data:", logData);
+    // if someone is not logged in
+    } else if (!isLoggedIn || !user) {
+      alert("must be logged in to log food");
+      return;
     }
   };
   

@@ -6,7 +6,8 @@ const FoodLogModal = ({ product, onClose, onSubmit }) => {
   const handleSubmit = () => {
     if (!servingSize) return alert("Please enter a serving size!");
     onSubmit({
-      ...product,
+      fdcId: product.fdcId,
+      productName: product.name, // to match the backend expected field name
       servingSize,
       mealType,
       timestamp: new Date().toISOString(),
