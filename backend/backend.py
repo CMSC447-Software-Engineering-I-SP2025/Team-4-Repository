@@ -7,6 +7,7 @@ from flask_cors import CORS
 from bson import ObjectId
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
+import traceback
 ##the authenticator produces output of form 
 ##    { "id": "1234", "given_name": "John", "name": "John Doe", "email": "john_doe@idp.example" }
 ## for now we can just store that whole thing, we will use the email as the indexing entity tho because theoretically we might want to support email password logins
@@ -430,6 +431,8 @@ def log_food():
     if request.method == 'POST':
         # get food intake data from frontend
         log_data = request.get_json()
+        # adding logs for debugging
+        print("data from frontend:", log_data)
         
         # food logging fields
         required_fields = ['email', 'fdcId', 'productName', 'servingSize', 'mealType', 'timestamp']
@@ -440,15 +443,13 @@ def log_food():
         
         # try to insert the log_data into the FOOD_LOG collection for the specified user
         try:
-            food_log_collection.insert_one(log_data)
+            food_collection.insert_one(log_data)
             return jsonify({"message": "food log added successfully :)"}), 200
         except Exception as e:
             print("POST error:", str(e))
+            traceback.print_exc() # running into an error when hitting submit on food to log
             return jsonify({"message": "error logging food :("}), 500
         
-    '''if request.method == 'POST':
-        
-    if request.method == 'DELETE':'''
 
 if __name__ == '__main__':
     app.run(debug=True)
