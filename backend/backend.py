@@ -437,7 +437,7 @@ def log_food():
         # print("data from frontend:", log_data)
         
         # food logging fields
-        required_fields = ['email', 'fdcId', 'productName', 'servingSize', 'mealType', 'timestamp']
+        required_fields = ['email', 'fdcId', 'productName', 'servingAmount', 'servingUnit', 'mealType', 'timestamp']
             
         # if returned dictionary in log_data does not contain all of the required fields
         if not all(field in log_data for field in required_fields):
@@ -451,59 +451,60 @@ def log_food():
             return jsonify({"message": "invalid timestamp format"}), 400
         
         # set vars for JSON to insert into mongoDB appropriately
+        nutrition = log_data.get("nutrition", {}) # get nutritional data from log_data 
         meal_type = log_data["mealType"].lower()
         email = log_data["email"]
+        
         
         # make sure a document exists for the user
         food_collection.update_one(
             {"email": email},
-            {"$setOnInsert": {"email": email, "logs": {}, "dailyTotals": {}}},
+            {"$setOnInsert": {"email": email, "logs": {}}},
             upsert=True
         )
         
-        # create nested structure for the date
+        # current user document
+        user_doc = food_collection.find_one({"email": email})
+        
+        # add meals and daily totals within the log for specific day
+        if not user_doc.get("logs", {}).get(log_date):
+            food_collection.update_one(
+                {"email": email, f"logs.{log_date}": {"$exists": False}},
+                {"$set": {f"logs.{log_date}": {"meals": {}, "dailyTotals": {}}}},
+                upsert=True
+            )
+        
+        # add meal type array for that specific day
+        if meal_type not in user_doc.get("logs", {}).get(log_date, {}).get("meals", {}):
+            food_collection.update_one(
+                {"email": email, f"logs.{log_date}.meals.{meal_type}": {"$exists": False}},
+                {"$set": {f"logs.{log_date}.meals.{meal_type}": []}},
+                upsert=True
+            )
+        
+        # add food entry to correct meal type array
         food_collection.update_one(
-            {"email": email, f"logs.{log_date}": {"$exists": False}},
-            {"$set": {f"logs.{log_date}": {"meals": {}}}}
+            {"email": email},
+            {"$push": {f"logs.{log_date}.meals.{meal_type}": log_data}}
         )
         
-        # meal type array structure
-        food_collection.update_one(
-            {"email": email, f"logs.{log_date}.meals.{meal_type}": {"$exists": False}},
-            {"$set": {f"logs.{log_date}.meals.{meal_type}": []}}
-        )
-        
-        try:
-            # push log into the correct meal type array
+        # OK UP TO HERE. code starts to add duplicate emails in backend
+        # if nutrition:
+            # inc_fields = {}
+        inc_fields = {}
+        for key, value in nutrition.items():
+            try:
+                numeric_value = float(value)
+                inc_fields[f"logs.{log_date}.dailyTotals.{key}"] = numeric_value
+            except ValueError:
+                continue
+        if inc_fields:
             food_collection.update_one(
                 {"email": email},
-                {"$push": {f"logs.{log_date}.meals.{meal_type}": log_data}}
+                {"$inc": inc_fields}
             )
             
-            # get nutritional data from log_data 
-            nutrition = log_data.get("nutrition", {})
-        
-            # update daily totals for calories if nutrition data exists
-            if nutrition:
-                inc_fields = {}
-                for key, value in nutrition.items():
-                    try:
-                        numeric_value = float(value)
-                        inc_fields[f"dailyTotals.{key}"] = numeric_value
-                    except Exception:
-                        pass
-                if inc_fields:
-                    food_collection.update_one(
-                        {"email": email},
-                        {"$inc": inc_fields}
-                    )
-                    
-            return jsonify({"message": "food log added successfully :)"}), 200
-        except Exception as e:
-            print("POST error:", str(e))
-            # traceback.print_exc()
-            return jsonify({"message": "error logging food"}), 500
-        
+        return jsonify({"message": "food log added successfully :)"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
