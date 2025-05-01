@@ -243,6 +243,8 @@ function ViewProducts() {
   const handleLogSubmit = async (logData) => {
     if (isLoggedIn && user){
     try {
+      const foodNutrients = selectedProduct?.foodNutrients || [];
+
       const nutrition = {
         calories: null,
         protein: null,
@@ -252,8 +254,8 @@ function ViewProducts() {
         vitamins: {}
       };
 
-      (logData.foodNutrients || []).forEach((nutrient) => {
-        const name = nutrient.nutrientName.toLowerCase();
+      foodNutrients.forEach((nutrient) => {
+        const name = nutrient.nutrientName?.toLowerCase();
         const value = nutrient.value;
 
         if (name.includes("energy")) nutrition.calories = value;

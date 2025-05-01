@@ -14,6 +14,7 @@ const FoodLogModal = ({ product, onClose, onSubmit }) => {
       servingUnit,      // ex. "oz"
       mealType,
       timestamp: new Date().toISOString(),
+      nutrition: product.nutrition
     });
   };
 

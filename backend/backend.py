@@ -372,29 +372,31 @@ def search_product():
                 "carbohydrates": None,
                 "sugars": None,
                 "vitamins": {}
-            }
+            },
+            "foodNutrients": food.get("foodNutrients", [])
         }
-        
-        if "foodNutrients" in food:
             
-            # get nutrition info about the products from the search query
-            for nutrient in food["foodNutrients"]:
-                nutrient_name = nutrient.get("nutrientName", "").lower()
-                nutrient_value = nutrient.get("value", "N/A")
-                
-                if "energy" in nutrient_name:
-                    food_info["nutrition"]["calories"] = nutrient_value
-                elif "protein" in nutrient_name:
-                    food_info["nutrition"]["protein"] = nutrient_value
-                elif "total lipid" in nutrient_name or "fat" in nutrient_name:
-                    food_info["nutrition"]["fat"] = nutrient_value
-                elif "carbohydrate" in nutrient_name:
-                    food_info["nutrition"]["carbohydrates"] = nutrient_value
-                elif "sugars" in nutrient_name:
-                    food_info["nutrition"]["sugars"] = nutrient_value
-                elif "vitamin" in nutrient_name:
-                    vitamin_name = nutrient.get("nutrientName", "Unknown Vitamin")
-                    food_info["nutrition"]["vitamins"][vitamin_name] = nutrient_value
+        # get nutrition info about the products from the search query
+        for nutrient in food.get("foodNutrients", []):
+            nutrient_name = nutrient.get("nutrientName", "").lower()
+            nutrient_value = nutrient.get("value")
+            
+            if nutrient_value is None:
+                continue
+            
+            if "energy" in nutrient_name:
+                food_info["nutrition"]["calories"] = nutrient_value
+            elif "protein" in nutrient_name:
+                food_info["nutrition"]["protein"] = nutrient_value
+            elif "total lipid" in nutrient_name or "fat" in nutrient_name:
+                food_info["nutrition"]["fat"] = nutrient_value
+            elif "carbohydrate" in nutrient_name:
+                food_info["nutrition"]["carbohydrates"] = nutrient_value
+            elif "sugars" in nutrient_name:
+                food_info["nutrition"]["sugars"] = nutrient_value
+            elif "vitamin" in nutrient_name:
+                vitamin_name = nutrient.get("nutrientName", "Unknown Vitamin")
+                food_info["nutrition"]["vitamins"][vitamin_name] = nutrient_value
     
         
         # add each product to results list
@@ -492,15 +494,16 @@ def log_food():
             # OK UP TO HERE. code starts to add duplicate emails in backend
             # if nutrition:
                 # inc_fields = {}
-            inc_fields = {}
-            for key, value in nutrition.items():
-                if value is None:
-                    continue # skip null values, was causing float error w/ None types
-                try:
-                    numeric_value = float(value)
-                    inc_fields[f"logs.{log_date}.dailyTotals.{key}"] = numeric_value
-                except Exception:
-                    print(f"Skipping invalid value for {key}: {value}")
+            if nutrition: 
+                inc_fields = {}
+                for key, value in nutrition.items():
+                    if value is None:
+                        continue # skip null values, was causing float error w/ None types
+                    try:
+                        numeric_value = float(value)
+                        inc_fields[f"logs.{log_date}.dailyTotals.{key}"] = numeric_value
+                    except Exception:
+                        print(f"Skipping invalid value for {key}: {value}")
             if inc_fields:
                 food_collection.update_one(
                     {"email": email},
