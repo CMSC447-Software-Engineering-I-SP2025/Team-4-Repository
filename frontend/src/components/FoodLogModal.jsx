@@ -32,8 +32,12 @@ const FoodLogModal = ({ product, onClose, onSubmit }) => {
 
     // scale the alr known macros
     ["calories", "protein", "fat", "carbohydrates", "sugars"].forEach((key) => {
-      if (scaledNutrition[key] != null) {
-        scaledNutrition[key] *= scaleFactor;
+      const original = parseFloat(scaledNutrition[key]);
+      if (!isNaN(original)) {
+        // updated macros to be rounded, whole numbers
+        scaledNutrition[key] = Math.round(original * scaleFactor);
+      } else {
+        scaledNutrition[key] = null;
       }
     });
 
@@ -41,7 +45,10 @@ const FoodLogModal = ({ product, onClose, onSubmit }) => {
     if (scaledNutrition.vitamins) {
       const newVitamins = {};
       for (const [name, value] of Object.entries(scaledNutrition.vitamins)) {
-        newVitamins[name] = value * scaleFactor;
+        const val = parseFloat(value);
+        if (!isNaN(val)){
+          newVitamins[name] = Math.round(value * scaleFactor);
+        }
       }
       scaledNutrition.vitamins = newVitamins;
     }
@@ -53,7 +60,7 @@ const FoodLogModal = ({ product, onClose, onSubmit }) => {
       servingUnit,      // ex. "oz"
       mealType,
       timestamp: new Date().toISOString(),
-      nutrition: scaledNutrition // need to send this as 
+      nutrition: scaledNutrition // need to send this instead of just product.nutrition
     });
   };
 
