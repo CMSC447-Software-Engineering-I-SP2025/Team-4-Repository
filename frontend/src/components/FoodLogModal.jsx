@@ -4,8 +4,47 @@ const FoodLogModal = ({ product, onClose, onSubmit }) => {
   const [servingUnit, setServingUnit] = useState("g"); // set grams as default value
   const [mealType, setMealType] = useState("breakfast");
 
+  // convert macros to grams so that an accurate calorie count can be calculated
+  const convertToGrams = (amount, unit) => {
+    const amt = parseFloat(amount);
+    if (isNaN(amt)) return null;
+
+    switch (unit) {
+      case "g": return amt;
+      case "oz": return amt * 28.35;
+      case "lb": return amt * 453.6;
+      case "fl oz": return amt * 29.57;
+      case "each": return amt * 100;    // per item estimate is around 100g
+      default: return null;
+    }
+  }
+
   const handleSubmit = () => {
     if (!servingAmount) return alert("Please enter a serving size!"); 
+
+    const amountInGrams = convertToGrams(servingAmount, servingUnit);
+    if (!amountInGrams) return alert("Invalid serving input");
+
+    const baseGrams = 100; // USDA data is typically per 100g
+    const scaleFactor = amountInGrams / baseGrams;
+
+    const scaledNutrition = { ...product.nutrition };
+
+    // scale the alr known macros
+    ["calories", "protein", "fat", "carbohydrates", "sugars"].forEach((key) => {
+      if (scaledNutrition[key] != null) {
+        scaledNutrition[key] *= scaleFactor;
+      }
+    });
+
+    // scale the vitamin values
+    if (scaledNutrition.vitamins) {
+      const newVitamins = {};
+      for (const [name, value] of Object.entries(scaledNutrition.vitamins)) {
+        newVitamins[name] = value * scaleFactor;
+      }
+      scaledNutrition.vitamins = newVitamins;
+    }
 
     onSubmit({
       fdcId: product.fdcId,
@@ -14,7 +53,7 @@ const FoodLogModal = ({ product, onClose, onSubmit }) => {
       servingUnit,      // ex. "oz"
       mealType,
       timestamp: new Date().toISOString(),
-      nutrition: product.nutrition
+      nutrition: scaledNutrition // need to send this as 
     });
   };
 

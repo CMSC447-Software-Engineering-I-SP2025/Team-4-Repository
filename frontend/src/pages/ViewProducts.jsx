@@ -243,31 +243,6 @@ function ViewProducts() {
   const handleLogSubmit = async (logData) => {
     if (isLoggedIn && user){
     try {
-      const foodNutrients = selectedProduct?.foodNutrients || [];
-
-      const nutrition = {
-        calories: null,
-        protein: null,
-        fat: null,
-        carbohydrates: null,
-        sugars: null,
-        vitamins: {}
-      };
-
-      foodNutrients.forEach((nutrient) => {
-        const name = nutrient.nutrientName?.toLowerCase();
-        const value = nutrient.value;
-
-        if (name.includes("energy")) nutrition.calories = value;
-        else if (name.includes("protein")) nutrition.protein = value;
-        else if (name.includes("fat") || name.includes("total lipid")) nutrition.fat = value;
-        else if (name.includes("carbohydrate")) nutrition.carbohydrates = value;
-        else if (name.includes("sugar")) nutrition.sugars = value;
-        else if (name.includes("vitamin")) {
-          nutrition.vitamins[nutrient.nutrientName] = value;
-        }
-      });
-
       const response = await fetch(`${BACKEND_API_URL}/log_food`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -279,7 +254,7 @@ function ViewProducts() {
           servingUnit: logData.servingUnit,
           mealType: logData.mealType,
           timestamp: logData.timestamp, // might change to just the date later
-          nutrition
+          nutrition: logData.nutrition,
         }),
       });
   
