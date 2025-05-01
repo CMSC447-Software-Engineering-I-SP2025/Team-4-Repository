@@ -243,6 +243,29 @@ function ViewProducts() {
   const handleLogSubmit = async (logData) => {
     if (isLoggedIn && user){
     try {
+      const nutrition = {
+        calories: null,
+        protein: null,
+        fat: null,
+        carbohydrates: null,
+        sugars: null,
+        vitamins: {}
+      };
+
+      (logData.foodNutrients || []).forEach((nutrient) => {
+        const name = nutrient.nutrientName.toLowerCase();
+        const value = nutrient.value;
+
+        if (name.includes("energy")) nutrition.calories = value;
+        else if (name.includes("protein")) nutrition.protein = value;
+        else if (name.includes("fat") || name.includes("total lipid")) nutrition.fat = value;
+        else if (name.includes("carbohydrate")) nutrition.carbohydrates = value;
+        else if (name.includes("sugar")) nutrition.sugars = value;
+        else if (name.includes("vitamin")) {
+          nutrition.vitamins[nutrient.nutrientName] = value;
+        }
+      });
+
       const response = await fetch(`${BACKEND_API_URL}/log_food`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -250,19 +273,26 @@ function ViewProducts() {
           email: user.email, // need to ensure that this is being defined
           fdcId: logData.fdcId,
           productName: logData.productName, // updated to match modal properties
-          servingSize: logData.servingSize,
+          servingAmount: logData.servingAmount,
+          servingUnit: logData.servingUnit,
           mealType: logData.mealType,
           timestamp: logData.timestamp, // might change to just the date later
+          nutrition
         }),
       });
   
-      const result = await response.json();
-      alert(result.message || "Log added! :)");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const message = errorData.message || `Error: ${response.status}`;
+        throw new Error(message);
+      }
+
+      const data = await response.json();
+      alert(data.message || "Log added! :)");
       setShowLogModal(false);
     } catch (err) {
       console.error("Error logging food:", err);
       alert("Error logging food.");
-      // console.log("User:", user); // for debugging
     }
 
     //console.log("sending log data:", logData);

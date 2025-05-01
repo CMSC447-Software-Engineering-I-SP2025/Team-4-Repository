@@ -1,14 +1,17 @@
 import { useState } from "react";
 const FoodLogModal = ({ product, onClose, onSubmit }) => {
-  const [servingSize, setServingSize] = useState("");
+  const [servingAmount, setServingAmount] = useState("");
+  const [servingUnit, setServingUnit] = useState("g"); // set grams as default value
   const [mealType, setMealType] = useState("breakfast");
 
   const handleSubmit = () => {
-    if (!servingSize) return alert("Please enter a serving size!");
+    if (!servingAmount) return alert("Please enter a serving size!"); 
+
     onSubmit({
       fdcId: product.fdcId,
       productName: product.name, // to match the backend expected field name
-      servingSize,
+      servingAmount,    // ex. 150
+      servingUnit,      // ex. "oz"
       mealType,
       timestamp: new Date().toISOString(),
     });
@@ -22,10 +25,19 @@ const FoodLogModal = ({ product, onClose, onSubmit }) => {
 
         <label>Serving Size:</label>
         <input
-          type="text"
-          value={servingSize}
-          onChange={(e) => setServingSize(e.target.value)}
+          type="number"
+          value={servingAmount}
+          onChange={(e) => setServingAmount(e.target.value)}
         />
+
+        <label>Unit:</label>
+        <select value={servingUnit} onChange={(e) => setServingUnit(e.target.value)}>
+          <option value="g">grams (g)</option>
+          <option value="oz">ounces (oz)</option>
+          <option value="lb">pounds (lb)</option>
+          <option value="fl oz">fluid ounces (fl oz)</option>
+          <option value="each">each</option>  {/*for items best measured as a count*/}
+        </select>
 
         <label>Meal Type:</label>
         <select value={mealType} onChange={(e) => setMealType(e.target.value)}>
