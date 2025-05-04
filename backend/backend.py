@@ -427,7 +427,7 @@ def search_product():
     })
     
 FOOD_LOG = 'food_intake' # new mongoDB collection for food storage logs. note: initializes the first time it is inserted into
-@app.route("/api/log_food", methods=["GET", "POST", "DELETE"])
+@app.route("/api/log_food", methods=["POST"])
 def log_food():
     # connect to 'food_log' collection in mongodb
     food_collection = data.atlas_client.get_collection(FOOD_LOG)
@@ -517,6 +517,19 @@ def log_food():
             import traceback
             traceback.print_exc()
             return jsonify({"message": "Server error while logging food."}), 500
+
+@app.route("/api/food_logs", methods=["GET"])
+def get_food_logs():
+    email = request.args.get("email")
+    if not email:
+        return jsonify({"message": "Email is required"}), 400
+    
+    food_collection = data.atlas_client.get_collection("food_intake")
+    user_doc = food_collection.find_one({"email": email}, {"_id": 0, "logs": 1})
+    if not user_doc:
+        return jsonify({"logs": {}}) # for empty logs
+    
+    return jsonify({"logs": user_doc.get("logs", {})}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
