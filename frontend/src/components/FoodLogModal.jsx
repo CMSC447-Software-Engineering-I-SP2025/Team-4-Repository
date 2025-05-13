@@ -94,6 +94,13 @@ const FoodLogModal = ({ product, onClose, onSubmit }) => {
           <option value="snacks">Snacks</option>
         </select>
 
+        <label>Date:</label>
+        <input
+          type="date"
+          value={logDate}
+          onChange={(e) => setLogDate(e.target.value)}
+        />
+
         <button onClick={handleSubmit}>Submit</button>
         <button onClick={onClose}>Cancel</button>
       </div>
