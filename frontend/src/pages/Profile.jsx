@@ -19,7 +19,7 @@ const Profile = () => {
 
   return (
     <div>
-      <h2>Your Food Logs</h2>
+      <h2>My Food Logs</h2>
       {Object.keys(foodLogs).length === 0 ? (
         <p>No logs yet.</p>
       ) : (
